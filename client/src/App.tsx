@@ -7,6 +7,7 @@ import {
 
 import Login from "./Authentication/Login";
 import Register from "./Authentication/Register";
+import ForgotPassword from "./Authentication/Forgotpassword"; 
 
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
@@ -37,6 +38,11 @@ function App() {
         <Route
           path="/register"
           element={<Register />}
+        />
+
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
 
         {/* PROTECTED ROUTES */}
