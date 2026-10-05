@@ -22,16 +22,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ================= PUBLIC ROUTES ================= */}
+        {/* PUBLIC ROUTES */}
 
         <Route
           path="/"
-          element={
-            <Navigate
-              to="/login"
-              replace
-            />
-          }
+          element={<Navigate to="/login" replace />}
         />
 
         <Route
@@ -44,7 +39,7 @@ function App() {
           element={<Register />}
         />
 
-        {/* ================= PROTECTED ROUTES ================= */}
+        {/* PROTECTED ROUTES */}
 
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
@@ -75,7 +70,7 @@ function App() {
           </Route>
         </Route>
 
-        {/* ================= UNKNOWN ROUTES ================= */}
+        {/* UNKNOWN ROUTES */}
 
         <Route
           path="*"
