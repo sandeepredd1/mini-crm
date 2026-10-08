@@ -1,3 +1,4 @@
+
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -13,6 +14,7 @@ import {
 
 const router = Router();
 
+/* Authentication rate limiter */
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -23,9 +25,11 @@ const authRateLimiter = rateLimit({
   },
 });
 
-/**
- * POST /api/auth/register
- */
+/* =========================
+   REGISTER
+   POST /api/auth/register
+========================= */
+
 router.post(
   "/register",
   authRateLimiter,
@@ -34,7 +38,13 @@ router.post(
     try {
       const { name, email, password } = req.body;
 
-      const existingUser = await User.findOne({ email });
+      // Normalize email
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check existing user
+      const existingUser = await User.findOne({
+        email: normalizedEmail,
+      });
 
       if (existingUser) {
         res.status(409).json({
@@ -43,23 +53,27 @@ router.post(
         return;
       }
 
+      // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
 
+      // Create user
       const user = await User.create({
-        name,
-        email,
+        name: name.trim(),
+        email: normalizedEmail,
         password: hashedPassword,
       });
 
       res.status(201).json({
         message: "Registration successful",
         user: {
-          id: user._id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
         },
       });
-    } catch {
+    } catch (error) {
+      console.error("REGISTER ERROR:", error);
+
       res.status(500).json({
         message: "Unable to register user",
       });
@@ -67,9 +81,11 @@ router.post(
   }
 );
 
-/**
- * POST /api/auth/login
- */
+/* =========================
+   LOGIN
+   POST /api/auth/login
+========================= */
+
 router.post(
   "/login",
   authRateLimiter,
@@ -78,7 +94,11 @@ router.post(
     try {
       const { email, password } = req.body;
 
-      const user = await User.findOne({ email });
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const user = await User.findOne({
+        email: normalizedEmail,
+      });
 
       if (!user) {
         res.status(401).json({
@@ -102,6 +122,8 @@ router.post(
       const jwtSecret = process.env.JWT_SECRET;
 
       if (!jwtSecret) {
+        console.error("JWT_SECRET is missing");
+
         res.status(500).json({
           message: "Server authentication configuration is missing",
         });
@@ -131,12 +153,14 @@ router.post(
       res.status(200).json({
         message: "Login successful",
         user: {
-          id: user._id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
         },
       });
-    } catch {
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+
       res.status(500).json({
         message: "Unable to login",
       });
@@ -144,9 +168,11 @@ router.post(
   }
 );
 
-/**
- * GET /api/auth/me
- */
+/* =========================
+   CURRENT USER
+   GET /api/auth/me
+========================= */
+
 router.get(
   "/me",
   requireAuth,
@@ -166,12 +192,14 @@ router.get(
 
       res.status(200).json({
         user: {
-          id: user._id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
         },
       });
-    } catch {
+    } catch (error) {
+      console.error("AUTH ME ERROR:", error);
+
       res.status(500).json({
         message: "Unable to restore session",
       });
@@ -179,9 +207,11 @@ router.get(
   }
 );
 
-/**
- * POST /api/auth/logout
- */
+/* =========================
+   LOGOUT
+   POST /api/auth/logout
+========================= */
+
 router.post(
   "/logout",
   requireAuth,
