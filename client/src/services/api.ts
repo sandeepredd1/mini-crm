@@ -14,15 +14,7 @@ const api = axios.create({
   },
 });
 
-// Prevent duplicate /api prefixes.
-api.interceptors.request.use((config) => {
-  if (config.url) {
-    config.url = config.url.replace(/^\/+api(?=\/|$)/, "");
-  }
-
-  return config;
-});
-
+// Redirect to login when a protected API request returns 401.
 const publicAuthEndpoints = new Set([
   "/auth/login",
   "/auth/register",
@@ -35,11 +27,8 @@ api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (axios.isAxiosError(error)) {
-      const requestUrl = (error.config?.url ?? "")
-        .replace(/^\/+/, "")
-        .replace(/^api(?=\/|$)/, "");
-
-      const normalizedUrl = `/${requestUrl}`;
+      const requestUrl = (error.config?.url ?? "").split("?")[0];
+      const normalizedUrl = `/${requestUrl.replace(/^\/+/, "")}`;
 
       if (
         error.response?.status === 401 &&
