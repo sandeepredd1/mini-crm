@@ -2,7 +2,8 @@
 import axios from "axios";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api"
 ).replace(/\/+$/, "");
 
 const api = axios.create({
@@ -13,8 +14,7 @@ const api = axios.create({
   },
 });
 
-// Prevent duplicate /api when page files use "/api/customers"
-// instead of "/customers".
+// Prevent duplicate /api prefixes.
 api.interceptors.request.use((config) => {
   const url = config.url ?? "";
 
@@ -36,15 +36,19 @@ const publicAuthEndpoints = new Set([
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    if (
-      axios.isAxiosError(error) &&
-      error.response?.status === 401 &&
-      !publicAuthEndpoints.has(
-        (error.config?.url ?? "").replace(/^\/api(?=\/|$)/, "")
-      ) &&
-      window.location.pathname !== "/login"
-    ) {
-      window.location.assign("/login");
+    if (axios.isAxiosError(error)) {
+      const requestUrl = (error.config?.url ?? "").replace(
+        /^\/api(?=\/|$)/,
+        ""
+      );
+
+      if (
+        error.response?.status === 401 &&
+        !publicAuthEndpoints.has(requestUrl) &&
+        window.location.pathname !== "/login"
+      ) {
+        window.location.assign("/login");
+      }
     }
 
     return Promise.reject(error);
