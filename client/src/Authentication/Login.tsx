@@ -14,6 +14,7 @@ import {
 
 import { useAuth } from "../context/auth-state";
 import AuthVisualBackground from "../components/auth/AuthVisualBackground";
+
 interface FormErrors {
   email?: string;
   password?: string;

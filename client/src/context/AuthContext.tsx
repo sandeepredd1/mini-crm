@@ -1,85 +1,84 @@
 
 import {
+  createContext,
+  useCallback,
+  useContext,
   useEffect,
   useState,
+  type ReactNode,
 } from "react";
-import type { ReactNode } from "react";
-import axios from "axios";
 
 import api from "../services/api";
-import { AuthContext } from "./auth-state";
-import type {
-  AuthContextType,
-  User,
-} from "./auth-state";
+import type { User, AuthContextType } from "./auth-state";
+
+export const AuthContext = createContext<
+  AuthContextType | undefined
+>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-export function AuthProvider({
-  children,
-}: AuthProviderProps) {
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Get the currently logged-in user
-  const refreshUser = async (): Promise<void> => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     try {
       const response = await api.get("/auth/me");
-      setUser(response.data.user);
-    } catch (error: unknown) {
-      if (
-        axios.isAxiosError(error) &&
-        error.response?.status === 401
-      ) {
-        setUser(null);
-        return;
-      }
-
+      setUser(response.data.user ?? null);
+    } catch (error) {
+      setUser(null);
       throw error;
     }
-  };
+  }, []);
 
-  // Login
-  const login = async (
-    email: string,
-    password: string
-  ): Promise<void> => {
-    const response = await api.post("/auth/login", {
-      email,
-      password,
-    });
+  const login = useCallback(
+    async (email: string, password: string): Promise<void> => {
+      const response = await api.post("/auth/login", {
+        email: email.trim(),
+        password,
+      });
 
-    setUser(response.data.user);
-  };
+      setUser(response.data.user);
+    },
+    []
+  );
 
-  // Logout
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     try {
-      await api.post("/auth/logout", {});
+      await api.post("/auth/logout");
     } finally {
       setUser(null);
     }
-  };
+  }, []);
 
-  // Initialize authentication when the app loads
   useEffect(() => {
+    let active = true;
+
     const initializeAuth = async () => {
       try {
-        await refreshUser();
-      } catch (error) {
-        console.error(
-          "Failed to initialize authentication:",
-          error
-        );
-        setUser(null);
+        const response = await api.get("/auth/me");
+
+        if (active) {
+          setUser(response.data.user ?? null);
+        }
+      } catch {
+        if (active) {
+          setUser(null);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     void initializeAuth();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const value: AuthContextType = {
@@ -96,4 +95,16 @@ export function AuthProvider({
       {children}
     </AuthContext.Provider>
   );
+}
+
+export function useAuth(): AuthContextType {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used inside an AuthProvider"
+    );
+  }
+
+  return context;
 }
