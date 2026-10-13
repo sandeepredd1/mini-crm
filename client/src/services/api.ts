@@ -2,7 +2,8 @@
 import axios from "axios";
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api"
 ).replace(/\/+$/, "");
 
 const api = axios.create({
@@ -13,8 +14,8 @@ const api = axios.create({
   },
 });
 
+// Prevent duplicate /api prefixes.
 api.interceptors.request.use((config) => {
-  // Prevent duplicate /api when a request accidentally includes it.
   if (config.url) {
     config.url = config.url.replace(/^\/api(?=\/|$)/, "");
   }
