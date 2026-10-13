@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
 import authRouter from "./routes/auth";
+import dashboardRouter from "./routes/dashboard";
 
 const app = express();
 
@@ -57,6 +58,9 @@ app.get("/api/health", (_req, res) => {
 
 // Authentication endpoints
 app.use("/api/auth", authRouter);
+
+// Dashboard endpoints
+app.use("/api/dashboard", dashboardRouter);
 
 // Unknown route handler
 app.use((_req, res) => {
