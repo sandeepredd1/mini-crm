@@ -14,33 +14,4 @@ const api = axios.create({
   },
 });
 
-// Redirect to login when a protected API request returns 401.
-const publicAuthEndpoints = new Set([
-  "/auth/login",
-  "/auth/register",
-  "/auth/me",
-  "/auth/forgot-password",
-  "/auth/reset-password",
-]);
-
-api.interceptors.response.use(
-  (response) => response,
-  (error: unknown) => {
-    if (axios.isAxiosError(error)) {
-      const requestUrl = (error.config?.url ?? "").split("?")[0];
-      const normalizedUrl = `/${requestUrl.replace(/^\/+/, "")}`;
-
-      if (
-        error.response?.status === 401 &&
-        !publicAuthEndpoints.has(normalizedUrl) &&
-        window.location.pathname !== "/login"
-      ) {
-        window.location.assign("/login");
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
-
 export default api;
