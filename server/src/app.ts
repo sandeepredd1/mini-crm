@@ -6,26 +6,34 @@ import helmet from "helmet";
 
 import authRouter from "./routes/auth";
 
-// Import other routers if they exist in your project.
-// import dashboardRouter from "./routes/dashboard";
-// import customersRouter from "./routes/customers";
-// import dealsRouter from "./routes/deals";
-// import tasksRouter from "./routes/tasks";
-
 const app = express();
 
-const clientUrl =
-  process.env.CLIENT_URL ||
-  "http://localhost:5173";
+// Allowed frontend URLs from Render environment variables
+const allowedOrigins = (
+  process.env.CLIENT_URL || "http://localhost:5173"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // Security middleware
 app.use(helmet());
 
-// Allow the frontend to communicate with the API
+// CORS configuration
 app.use(
   cors({
-    origin: clientUrl,
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.error("CORS blocked origin:", origin);
+      return callback(new Error("Origin not allowed by CORS"));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
@@ -46,17 +54,12 @@ app.get("/", (_req, res) => {
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     message: "CRM API is running",
+    status: "OK",
   });
 });
 
 // Authentication routes
 app.use("/api/auth", authRouter);
-
-// Add these only if the corresponding router files exist.
-// app.use("/api/dashboard", dashboardRouter);
-// app.use("/api/customers", customersRouter);
-// app.use("/api/deals", dealsRouter);
-// app.use("/api/tasks", tasksRouter);
 
 // Handle unknown routes
 app.use((_req, res) => {

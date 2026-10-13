@@ -1,3 +1,4 @@
+
 import { createContext, useContext } from "react";
 
 export interface User {
@@ -15,15 +16,17 @@ export interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
-);
+export const AuthContext = createContext<
+  AuthContextType | undefined
+>(undefined);
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside an AuthProvider");
+    throw new Error(
+      "useAuth must be used inside an AuthProvider"
+    );
   }
 
   return context;
