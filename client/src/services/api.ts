@@ -16,7 +16,7 @@ const api = axios.create({
   },
 });
 
-// Redirect to login when a protected API request returns 401.
+// Do not redirect to login for public authentication endpoints.
 const publicAuthEndpoints = new Set([
   "/auth/login",
   "/auth/register",
@@ -31,7 +31,6 @@ api.interceptors.response.use(
     if (axios.isAxiosError(error)) {
       const requestUrl = (error.config?.url ?? "").split("?")[0];
 
-      // Normalize URLs such as /auth/login and /api/auth/login.
       const normalizedUrl = `/${requestUrl
         .replace(/^\/+/, "")
         .replace(/^api\/+/, "")}`;
