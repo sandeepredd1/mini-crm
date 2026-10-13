@@ -76,8 +76,31 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const deals = await Deal.find({
+      const stage =
+        typeof req.query.stage === "string" ? req.query.stage : "";
+      const customerId =
+        typeof req.query.customerId === "string"
+          ? req.query.customerId
+          : "";
+
+      if (stage && !["Lead", "Qualified", "Proposal", "Won", "Lost"].includes(stage)) {
+        res.status(400).json({ message: "Invalid deal stage filter" });
+        return;
+      }
+
+      if (customerId && !Types.ObjectId.isValid(customerId)) {
+        res.status(400).json({ message: "Invalid customer ID" });
+        return;
+      }
+
+      const query: Record<string, unknown> = {
         userId: req.userId,
+      };
+      if (stage) query.stage = stage;
+      if (customerId) query.customerId = customerId;
+
+      const deals = await Deal.find({
+        ...query,
       })
         .populate("customerId", "name company email")
         .sort({ createdAt: -1 });
@@ -105,7 +128,7 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -150,7 +173,7 @@ router.put(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
       const { customerId } = req.body;
 
       if (!Types.ObjectId.isValid(id)) {
@@ -227,7 +250,7 @@ router.delete(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({

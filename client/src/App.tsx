@@ -8,6 +8,7 @@ import {
 import Login from "./Authentication/Login";
 import Register from "./Authentication/Register";
 import ForgotPassword from "./Authentication/Forgotpassword"; 
+import ResetPassword from "./Authentication/ResetPassword";
 
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
@@ -43,6 +44,11 @@ function App() {
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
+        />
+
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
         />
 
         {/* PROTECTED ROUTES */}

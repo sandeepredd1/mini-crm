@@ -1,11 +1,19 @@
 
 import { Router, Request, Response } from "express";
+import { createHash, randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import nodemailer from "nodemailer";
 
 import User from "../models/User";
-import { loginSchema, registerSchema } from "../validation/schemas";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  logoutSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from "../validation/schemas";
 import { validate } from "../middleware/validate";
 import {
   AuthenticatedRequest,
@@ -22,6 +30,16 @@ const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     message: "Too many authentication attempts. Please try again later.",
+  },
+});
+
+const passwordResetRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many password reset requests. Please try again later.",
   },
 });
 
@@ -215,6 +233,7 @@ router.get(
 router.post(
   "/logout",
   requireAuth,
+  validate(logoutSchema),
   (_req: AuthenticatedRequest, res: Response): void => {
     res.clearCookie("token", {
       httpOnly: true,
@@ -228,6 +247,110 @@ router.post(
     res.status(200).json({
       message: "Logout successful",
     });
+  }
+);
+
+router.post(
+  "/forgot-password",
+  passwordResetRateLimiter,
+  validate(forgotPasswordSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    const smtpUrl = process.env.SMTP_URL;
+    const mailFrom = process.env.MAIL_FROM;
+    const clientUrl = process.env.CLIENT_URL?.split(",")[0]?.trim();
+
+    if (!smtpUrl || !mailFrom || !clientUrl) {
+      res.status(503).json({
+        message: "Password reset email is not configured on this server",
+      });
+      return;
+    }
+
+    let transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
+    try {
+      const user = await User.findOne({
+        email: req.body.email,
+      });
+
+      if (user) {
+        const token = randomBytes(32).toString("hex");
+        const resetTokenHash = createHash("sha256")
+          .update(token)
+          .digest("hex");
+        await User.findByIdAndUpdate(user._id, {
+          $set: {
+            resetTokenHash,
+            resetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+
+        const resetUrl = new URL("/reset-password", clientUrl);
+        resetUrl.searchParams.set("token", token);
+
+        transporter = nodemailer.createTransport(smtpUrl);
+        await transporter.sendMail({
+          from: mailFrom,
+          to: user.email,
+          subject: "Reset your Mini CRM password",
+          text: `Use this link within one hour to reset your password: ${resetUrl.toString()}`,
+        });
+      }
+
+      res.status(202).json({
+        message: "If an account exists for that email, a reset link will be sent",
+      });
+    } catch {
+      console.error("Password reset email delivery failed");
+      res.status(500).json({
+        message: "Unable to send the password reset email",
+      });
+    } finally {
+      transporter?.close();
+    }
+  }
+);
+
+router.post(
+  "/reset-password",
+  passwordResetRateLimiter,
+  validate(resetPasswordSchema),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const resetTokenHash = createHash("sha256")
+        .update(req.body.token)
+        .digest("hex");
+      const password = await bcrypt.hash(req.body.password, 12);
+      const user = await User.findOneAndUpdate(
+        {
+          resetTokenHash,
+          resetTokenExpiresAt: { $gt: new Date() },
+        },
+        {
+          $set: { password },
+          $unset: {
+            resetTokenHash: 1,
+            resetTokenExpiresAt: 1,
+          },
+        },
+        { new: true }
+      );
+
+      if (!user) {
+        res.status(400).json({
+          message: "This password reset link is invalid or has expired",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        message: "Password reset successfully",
+      });
+    } catch {
+      console.error("Password reset failed");
+      res.status(500).json({
+        message: "Unable to reset password",
+      });
+    }
   }
 );
 

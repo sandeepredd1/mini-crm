@@ -1,14 +1,35 @@
 import axios from "axios";
 
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
-
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+const publicAuthEndpoints = new Set([
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/me",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+]);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      !publicAuthEndpoints.has(error.config?.url ?? "") &&
+      window.location.pathname !== "/login"
+    ) {
+      window.location.assign("/login");
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;

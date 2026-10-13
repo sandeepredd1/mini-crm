@@ -108,9 +108,56 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const tasks = await Task.find({
+      const status =
+        typeof req.query.status === "string" ? req.query.status : "";
+      const customerId =
+        typeof req.query.customerId === "string"
+          ? req.query.customerId
+          : "";
+      const dealId =
+        typeof req.query.dealId === "string" ? req.query.dealId : "";
+
+      if (
+        status &&
+        !["today", "upcoming", "overdue", "completed"].includes(status)
+      ) {
+        res.status(400).json({ message: "Invalid task status filter" });
+        return;
+      }
+      if (customerId && !Types.ObjectId.isValid(customerId)) {
+        res.status(400).json({ message: "Invalid customer ID" });
+        return;
+      }
+      if (dealId && !Types.ObjectId.isValid(dealId)) {
+        res.status(400).json({ message: "Invalid deal ID" });
+        return;
+      }
+
+      const now = new Date();
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfTomorrow = new Date(startOfToday);
+      startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+      const query: Record<string, unknown> = {
         userId: req.userId,
-      })
+      };
+      if (customerId) query.customerId = customerId;
+      if (dealId) query.dealId = dealId;
+      if (status === "completed") {
+        query.completed = true;
+      } else if (status === "overdue") {
+        query.completed = false;
+        query.dueDate = { $lt: startOfToday };
+      } else if (status === "today") {
+        query.completed = false;
+        query.dueDate = { $gte: startOfToday, $lt: startOfTomorrow };
+      } else if (status === "upcoming") {
+        query.completed = false;
+        query.dueDate = { $gte: startOfTomorrow };
+      }
+
+      const tasks = await Task.find(query)
         .populate("customerId", "name company email")
         .populate("dealId", "title value stage")
         .sort({ dueDate: 1 });
@@ -138,7 +185,7 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       // Validate task ID
       if (!Types.ObjectId.isValid(id)) {
@@ -186,7 +233,7 @@ router.put(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
       const { customerId, dealId } = req.body;
 
       // Validate task ID
@@ -241,22 +288,29 @@ router.put(
         }
       }
 
-      // Update task
+      const updateFields: Record<string, unknown> = {
+        ...req.body,
+      };
+      delete updateFields.customerId;
+      delete updateFields.dealId;
+      if (customerId) {
+        updateFields.customerId = new Types.ObjectId(customerId);
+      }
+      if (dealId) {
+        updateFields.dealId = new Types.ObjectId(dealId);
+      }
+
+      const unsetFields: Record<string, 1> = {};
+      if (!customerId) unsetFields.customerId = 1;
+      if (!dealId) unsetFields.dealId = 1;
+
       const task = await Task.findOneAndUpdate(
+        { _id: id, userId: req.userId },
         {
-          _id: id,
-          userId: req.userId,
-        },
-        {
-          $set: {
-            ...req.body,
-            customerId: customerId
-              ? new Types.ObjectId(customerId)
-              : undefined,
-            dealId: dealId
-              ? new Types.ObjectId(dealId)
-              : undefined,
-          },
+          $set: updateFields,
+          ...(Object.keys(unsetFields).length > 0
+            ? { $unset: unsetFields }
+            : {}),
         },
         {
           new: true,
@@ -297,7 +351,7 @@ router.delete(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       // Validate task ID
       if (!Types.ObjectId.isValid(id)) {

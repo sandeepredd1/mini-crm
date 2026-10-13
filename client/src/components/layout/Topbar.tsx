@@ -1,14 +1,13 @@
 import {
-  Bell,
   ChevronDown,
   LogOut,
   Menu,
-  Search,
   UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/auth-state";
+import TopbarActions from "./TopbarActions";
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -65,11 +64,6 @@ export default function Topbar({
     };
   }, []);
 
-  /* CLOSE PROFILE WHEN PAGE CHANGES */
-  useEffect(() => {
-    setProfileOpen(false);
-  }, [location.pathname]);
-
   const handleLogout = async () => {
     setProfileOpen(false);
     await logout();
@@ -116,32 +110,7 @@ export default function Topbar({
 
         <div className="flex items-center gap-2 sm:gap-4">
 
-          {/* SEARCH */}
-          <button
-            type="button"
-            aria-label="Search"
-            className="group hidden h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-400 transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-100 hover:bg-orange-50 hover:text-orange-600 hover:shadow-sm sm:flex"
-          >
-            <Search
-              size={19}
-              className="transition-transform duration-300 group-hover:scale-110"
-            />
-          </button>
-
-          {/* NOTIFICATION */}
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="group relative flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-gray-400 transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-100 hover:bg-orange-50 hover:text-orange-600 hover:shadow-sm"
-          >
-            <Bell
-              size={19}
-              className="transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"
-            />
-
-            {/* NOTIFICATION DOT */}
-            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white animate-pulse" />
-          </button>
+          <TopbarActions />
 
           {/* DIVIDER */}
           <div className="hidden h-8 w-px bg-orange-100 sm:block" />

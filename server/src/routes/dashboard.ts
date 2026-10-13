@@ -52,17 +52,17 @@ router.get(
 
       // Run dashboard queries in parallel
       const [
-        totalCustomers,
+        customerResult,
         openPipelineResult,
-        dealsWonThisMonth,
-        tasksDueToday,
-        overdueTasks,
+        dealsWonResult,
+        tasksDueTodayResult,
+        overdueTasksResult,
         pipelineByStage,
       ] = await Promise.all([
-        // Total customers
-        Customer.countDocuments({
-          userId,
-        }),
+        Customer.aggregate([
+          { $match: { userId } },
+          { $count: "total" },
+        ]),
 
         // Open pipeline value
         Deal.aggregate([
@@ -85,33 +85,46 @@ router.get(
         ]),
 
         // Deals won this month
-        Deal.countDocuments({
-          userId,
-          stage: "Won",
-          updatedAt: {
-            $gte: startOfMonth,
-            $lte: endOfMonth,
+        Deal.aggregate([
+          {
+            $match: {
+              userId,
+              stage: "Won",
+              updatedAt: {
+                $gte: startOfMonth,
+                $lte: endOfMonth,
+              },
+            },
           },
-        }),
+          { $count: "total" },
+        ]),
 
-        // Tasks due today
-        Task.countDocuments({
-          userId,
-          completed: false,
-          dueDate: {
-            $gte: startOfToday,
-            $lte: endOfToday,
+        Task.aggregate([
+          {
+            $match: {
+              userId,
+              completed: false,
+              dueDate: {
+                $gte: startOfToday,
+                $lte: endOfToday,
+              },
+            },
           },
-        }),
+          { $count: "total" },
+        ]),
 
-        // Overdue tasks
-        Task.countDocuments({
-          userId,
-          completed: false,
-          dueDate: {
-            $lt: startOfToday,
+        Task.aggregate([
+          {
+            $match: {
+              userId,
+              completed: false,
+              dueDate: {
+                $lt: startOfToday,
+              },
+            },
           },
-        }),
+          { $count: "total" },
+        ]),
 
         // Pipeline value by stage
         Deal.aggregate([
@@ -139,10 +152,11 @@ router.get(
         ]),
       ]);
 
-      const openPipelineValue =
-        openPipelineResult.length > 0
-          ? openPipelineResult[0].total
-          : 0;
+      const totalCustomers = customerResult[0]?.total ?? 0;
+      const dealsWonThisMonth = dealsWonResult[0]?.total ?? 0;
+      const tasksDueToday = tasksDueTodayResult[0]?.total ?? 0;
+      const overdueTasks = overdueTasksResult[0]?.total ?? 0;
+      const openPipelineValue = openPipelineResult[0]?.total ?? 0;
 
       const pipeline = pipelineByStage.map((item) => ({
         stage: item._id,

@@ -32,6 +32,20 @@ export const loginSchema = z.object({
     .min(1, "Password is required"),
 });
 
+export const logoutSchema = z.object({}).strict();
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address").toLowerCase(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(32, "Reset token is required").max(256),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(100, "Password must not exceed 100 characters"),
+});
+
 export const customerSchema = z.object({
   name: z
     .string()

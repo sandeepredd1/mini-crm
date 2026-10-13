@@ -11,6 +11,9 @@ import { customerSchema } from "../validation/schemas";
 
 const router = Router();
 
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * POST /api/customers
  * Create a customer
@@ -53,7 +56,7 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -98,7 +101,7 @@ router.put(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -152,7 +155,7 @@ router.delete(
     res: Response
   ): Promise<void> => {
     try {
-      const { id } = req.params;
+      const id = typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -216,34 +219,37 @@ router.get(
           ? Number(req.query.limit)
           : 10;
 
-      const page =
-        Number.isInteger(pageValue) && pageValue > 0
-          ? pageValue
-          : 1;
+      if (!Number.isInteger(pageValue) || pageValue < 1) {
+        res.status(400).json({ message: "Page must be a positive integer" });
+        return;
+      }
+      if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 100) {
+        res.status(400).json({ message: "Limit must be between 1 and 100" });
+        return;
+      }
+      if (status && !["active", "inactive", "lead"].includes(status)) {
+        res.status(400).json({ message: "Invalid customer status filter" });
+        return;
+      }
 
-      const limit =
-        Number.isInteger(limitValue) &&
-        limitValue > 0 &&
-        limitValue <= 100
-          ? limitValue
-          : 10;
+      const page = pageValue;
+      const limit = limitValue;
 
       const query: Record<string, unknown> = {
         userId: req.userId,
       };
 
       if (search) {
+        const safeSearch = escapeRegex(search);
         query.$or = [
-          { name: { $regex: search, $options: "i" } },
-          { company: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { phone: { $regex: search, $options: "i" } },
+          { name: { $regex: safeSearch, $options: "i" } },
+          { company: { $regex: safeSearch, $options: "i" } },
+          { email: { $regex: safeSearch, $options: "i" } },
+          { phone: { $regex: safeSearch, $options: "i" } },
         ];
       }
 
-      if (["active", "inactive", "lead"].includes(status)) {
-        query.status = status;
-      }
+      if (status) query.status = status;
 
       const skip = (page - 1) * limit;
 

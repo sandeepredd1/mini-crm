@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BarChart3,
   BriefcaseBusiness,
   CheckSquare,
@@ -9,7 +10,7 @@ import {
   Flame,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/auth-state";
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -71,7 +72,7 @@ export default function Sidebar({
       >
         {/* ================= LOGO ================= */}
 
-        <div className="relative flex h-[76px] items-center justify-between overflow-hidden border-b border-orange-50 px-5">
+        <div className="relative flex h-[82px] items-center justify-between overflow-hidden border-b border-slate-100 bg-gradient-to-r from-white via-white to-orange-50/70 px-5">
           {/* Decorative background */}
           <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-orange-100/50 blur-2xl" />
 
@@ -80,7 +81,7 @@ export default function Sidebar({
             <div className="group relative">
               <div className="absolute inset-0 rounded-xl bg-orange-400 opacity-20 blur-md transition-all duration-500 group-hover:opacity-50 group-hover:blur-lg" />
 
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200 transition-all duration-500 group-hover:-translate-y-1 group-hover:rotate-3 group-hover:scale-110 group-hover:shadow-xl">
+              <div className="relative flex h-11 w-11 items-center justify-center rounded-[15px] bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200/80 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:rotate-2 group-hover:shadow-xl">
                 <BarChart3
                   size={21}
                   className="transition-transform duration-500 group-hover:scale-110"
@@ -92,11 +93,11 @@ export default function Sidebar({
 
             {/* BRAND */}
             <div className="animate-[fadeRight_.5s_ease-out]">
-              <h1 className="bg-gradient-to-r from-orange-600 to-amber-500 bg-clip-text text-lg font-extrabold tracking-tight text-transparent">
+              <h1 className="bg-gradient-to-r from-orange-600 to-amber-500 bg-clip-text text-[19px] font-extrabold tracking-tight text-transparent">
                 Mini CRM
               </h1>
 
-              <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              <p className="mt-0.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
                 <Flame
                   size={9}
                   className="text-orange-500"
@@ -121,16 +122,18 @@ export default function Sidebar({
 
         {/* ================= NAVIGATION ================= */}
 
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white via-white to-orange-50/30 px-4 py-6">
           <div className="mb-4 flex items-center justify-between px-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
               Main Menu
             </p>
 
-            <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm shadow-orange-300 animate-pulse" />
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold tracking-wide text-slate-400">
+              04
+            </span>
           </div>
 
-          <nav className="space-y-2">
+          <nav className="space-y-1.5">
             {menuItems.map((item, index) => {
               const Icon = item.icon;
 
@@ -143,31 +146,26 @@ export default function Sidebar({
                     animationDelay: `${index * 60}ms`,
                   }}
                   className={({ isActive }) =>
-                    `group relative flex items-center gap-3 overflow-hidden rounded-xl px-3.5 py-3 text-sm font-semibold transition-all duration-300 animate-[fadeRight_.45s_ease-out_both] ${
+                    `group relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all duration-200 animate-[fadeRight_.45s_ease-out_both] ${
                       isActive
-                        ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200 hover:-translate-y-0.5 hover:shadow-xl"
-                        : "text-gray-500 hover:-translate-y-0.5 hover:bg-orange-50 hover:text-orange-600 hover:shadow-md"
+                        ? "border-orange-100 bg-gradient-to-r from-orange-50 to-amber-50/70 text-orange-700 shadow-sm shadow-orange-100/70"
+                        : "border-transparent text-slate-500 hover:border-slate-100 hover:bg-white hover:text-slate-800 hover:shadow-sm"
                     }`
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      {/* ACTIVE SHINE */}
-                      {isActive && (
-                        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                      )}
-
                       {/* LEFT ACTIVE BAR */}
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-white shadow-lg" />
+                        <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-gradient-to-b from-orange-400 to-amber-500" />
                       )}
 
                       {/* ICON */}
                       <span
-                        className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-300 ${
+                        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 ${
                           isActive
-                            ? "bg-white/15 text-white"
-                            : "bg-gray-50 text-gray-400 group-hover:bg-orange-100 group-hover:text-orange-600"
+                          ? "bg-white text-orange-600 shadow-sm shadow-orange-200/70"
+                          : "bg-slate-50 text-slate-400 group-hover:bg-orange-50 group-hover:text-orange-600"
                         }`}
                       >
                         <Icon
@@ -183,7 +181,7 @@ export default function Sidebar({
 
                       {/* ACTIVE DOT */}
                       {isActive && (
-                        <span className="relative h-2 w-2 rounded-full bg-white shadow-sm animate-pulse" />
+                        <ArrowRight size={15} className="relative text-orange-400" />
                       )}
                     </>
                   )}
@@ -192,34 +190,18 @@ export default function Sidebar({
             })}
           </nav>
 
-          {/* SMALL INFO CARD */}
-          <div className="mt-8 overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50 p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-orange-100">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-md shadow-orange-200">
-                <Flame size={15} />
-              </div>
-
-              <span className="text-xs font-black text-orange-700">
-                CRM Workspace
-              </span>
-            </div>
-
-            <p className="text-[11px] leading-relaxed text-orange-600/70">
-              Manage customers, deals and tasks from one place.
-            </p>
-          </div>
         </div>
 
         {/* ================= USER / LOGOUT ================= */}
 
-        <div className="border-t border-orange-50 bg-gradient-to-b from-white to-orange-50/40 p-4">
+        <div className="border-t border-slate-100 bg-gradient-to-b from-white to-orange-50/50 p-4">
           {/* USER CARD */}
-          <div className="group mb-3 flex items-center gap-3 rounded-2xl border border-orange-100 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-100">
+          <div className="group mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-900/[0.025] transition-all duration-200 hover:border-orange-200 hover:shadow-md hover:shadow-orange-100/70">
             {/* AVATAR */}
             <div className="relative shrink-0">
               <div className="absolute inset-0 rounded-full bg-orange-400 opacity-20 blur-md transition-all duration-300 group-hover:opacity-50" />
 
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-sm font-black text-white shadow-md shadow-orange-200 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-[14px] bg-gradient-to-br from-orange-500 to-amber-500 text-sm font-black text-white shadow-md shadow-orange-200/80 transition-all duration-300 group-hover:scale-105">
                 {user?.name?.charAt(0).toUpperCase() || "U"}
               </div>
 
@@ -229,11 +211,11 @@ export default function Sidebar({
 
             {/* USER INFO */}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-gray-800 transition-colors duration-300 group-hover:text-orange-600">
+              <p className="truncate text-sm font-bold text-slate-800 transition-colors duration-200 group-hover:text-orange-600">
                 {user?.name || "User"}
               </p>
 
-              <p className="truncate text-xs text-gray-400">
+              <p className="truncate text-xs text-slate-400">
                 {user?.email || ""}
               </p>
             </div>
@@ -243,9 +225,9 @@ export default function Sidebar({
           <button
             type="button"
             onClick={handleLogout}
-            className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3.5 py-3 text-sm font-semibold text-gray-500 transition-all duration-300 hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-600 hover:shadow-md"
+            className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-semibold text-slate-500 transition-all duration-200 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 transition-all duration-300 group-hover:bg-red-100 group-hover:text-red-600">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 transition-all duration-200 group-hover:bg-rose-100 group-hover:text-rose-600">
               <LogOut
                 size={17}
                 className="transition-transform duration-300 group-hover:translate-x-0.5"

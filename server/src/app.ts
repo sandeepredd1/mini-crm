@@ -10,12 +10,33 @@ import taskRoutes from "./routes/tasks";
 import dashboardRoutes from "./routes/dashboard";
 
 const app = express();
+const allowedOrigins = new Set(
+  (process.env.CLIENT_URL ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 
 app.use(helmet());
 
+app.use((req, res, next) => {
+  const origin = req.get("origin");
+
+  if (origin && !allowedOrigins.has(origin)) {
+    res.status(403).json({
+      message: "This origin is not allowed",
+    });
+    return;
+  }
+
+  next();
+});
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      callback(null, !origin || allowedOrigins.has(origin));
+    },
     credentials: true,
   })
 );
@@ -32,6 +53,20 @@ app.use("/api/dashboard", dashboardRoutes);
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     message: "CRM API is running",
+  });
+});
+
+app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (error instanceof SyntaxError && "body" in error) {
+    res.status(400).json({
+      message: "Request body must contain valid JSON",
+    });
+    return;
+  }
+
+  console.error("Unhandled API error:", error);
+  res.status(500).json({
+    message: "An unexpected server error occurred",
   });
 });
 

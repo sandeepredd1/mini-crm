@@ -1,36 +1,12 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useState,
 } from "react";
 import type { ReactNode } from "react";
 import axios from "axios";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  login: (
-    email: string,
-    password: string
-  ) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-}
-
-const AuthContext = createContext<
-  AuthContextType | undefined
->(undefined);
+import api from "../services/api";
+import { AuthContext } from "./auth-state";
+import type { AuthContextType, User } from "./auth-state";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -47,22 +23,18 @@ export function AuthProvider({
 
   const refreshUser = async () => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/auth/me`,
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await api.get("/api/auth/me");
 
       setUser(response.data.user);
     } catch (error) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
           setUser(null);
+          return;
         }
-      } else {
-        setUser(null);
       }
+
+      throw error;
     }
   };
 
@@ -70,29 +42,17 @@ export function AuthProvider({
     email: string,
     password: string
   ) => {
-    const response = await axios.post(
-      `${API_URL}/api/auth/login`,
-      {
-        email,
-        password,
-      },
-      {
-        withCredentials: true,
-      }
-    );
+    const response = await api.post("/api/auth/login", {
+      email,
+      password,
+    });
 
     setUser(response.data.user);
   };
 
   const logout = async () => {
     try {
-      await axios.post(
-        `${API_URL}/api/auth/logout`,
-        {},
-        {
-          withCredentials: true,
-        }
-      );
+      await api.post("/api/auth/logout", {});
     } finally {
       setUser(null);
     }
@@ -102,6 +62,8 @@ export function AuthProvider({
     const initializeAuth = async () => {
       try {
         await refreshUser();
+      } catch {
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -124,16 +86,4 @@ export function AuthProvider({
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error(
-      "useAuth must be used inside an AuthProvider"
-    );
-  }
-
-  return context;
 }
