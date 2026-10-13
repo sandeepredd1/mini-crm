@@ -42,7 +42,9 @@ router.post(
   async (req, res) => {
     try {
       const { name, email, password } = req.body;
-      const normalizedEmail = String(email)
+
+      const normalizedName = String(name ?? "").trim();
+      const normalizedEmail = String(email ?? "")
         .trim()
         .toLowerCase();
 
@@ -52,8 +54,7 @@ router.post(
 
       if (existingUser) {
         res.status(409).json({
-          message:
-            "An account with this email already exists.",
+          message: "An account with this email already exists.",
         });
         return;
       }
@@ -64,7 +65,7 @@ router.post(
       );
 
       const user = await User.create({
-        name: String(name).trim(),
+        name: normalizedName,
         email: normalizedEmail,
         password: hashedPassword,
       });
@@ -77,12 +78,24 @@ router.post(
           email: user.email,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("REGISTER ERROR:", error);
 
+      // Handle duplicate email index errors
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === 11000
+      ) {
+        res.status(409).json({
+          message: "An account with this email already exists.",
+        });
+        return;
+      }
+
       res.status(500).json({
-        message:
-          "Unable to create your account. Please try again.",
+        message: "Unable to create your account. Please try again.",
       });
     }
   }
@@ -95,7 +108,8 @@ router.post(
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      const normalizedEmail = String(email)
+
+      const normalizedEmail = String(email ?? "")
         .trim()
         .toLowerCase();
 
@@ -128,7 +142,7 @@ router.post(
           email: user.email,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("LOGIN ERROR:", error);
 
       res.status(500).json({
@@ -168,9 +182,9 @@ router.get("/me", async (req, res) => {
       return;
     }
 
-    const user = await User.findById(
-      decoded.userId
-    ).select("-password");
+    const user = await User.findById(decoded.userId).select(
+      "-password"
+    );
 
     if (!user) {
       res.status(401).json({
@@ -186,7 +200,7 @@ router.get("/me", async (req, res) => {
         email: user.email,
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof jwt.JsonWebTokenError ||
       error instanceof jwt.TokenExpiredError

@@ -17,7 +17,7 @@ const api = axios.create({
 // Prevent duplicate /api prefixes.
 api.interceptors.request.use((config) => {
   if (config.url) {
-    config.url = config.url.replace(/^\/api(?=\/|$)/, "");
+    config.url = config.url.replace(/^\/+api(?=\/|$)/, "");
   }
 
   return config;
@@ -35,14 +35,15 @@ api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (axios.isAxiosError(error)) {
-      const requestUrl = (error.config?.url ?? "").replace(
-        /^\/api(?=\/|$)/,
-        ""
-      );
+      const requestUrl = (error.config?.url ?? "")
+        .replace(/^\/+/, "")
+        .replace(/^api(?=\/|$)/, "");
+
+      const normalizedUrl = `/${requestUrl}`;
 
       if (
         error.response?.status === 401 &&
-        !publicAuthEndpoints.has(requestUrl) &&
+        !publicAuthEndpoints.has(normalizedUrl) &&
         window.location.pathname !== "/login"
       ) {
         window.location.assign("/login");

@@ -8,12 +8,13 @@ import authRouter from "./routes/auth";
 
 const app = express();
 
-// Allowed frontend URLs from Render environment variables
+// Allowed frontend URLs
 const allowedOrigins = (
-  process.env.CLIENT_URL || "http://localhost:5173"
+  process.env.CLIENT_URL ||
+  "http://localhost:5173,https://aquamarine-profiterole-f0eb27.netlify.app"
 )
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
 // Security middleware
