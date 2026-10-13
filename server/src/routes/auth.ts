@@ -12,7 +12,6 @@ import {
 
 const router = Router();
 
-// Create JWT token
 const createToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
 
@@ -25,19 +24,17 @@ const createToken = (userId: string): string => {
   });
 };
 
-// Cookie configuration
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite:
-    process.env.NODE_ENV === "production"
-      ? ("none" as const)
-      : ("lax" as const),
+  sameSite: process.env.NODE_ENV === "production"
+    ? ("none" as const)
+    : ("lax" as const),
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-// REGISTER
+// POST /api/auth/register
 router.post(
   "/register",
   validate(registerSchema),
@@ -50,7 +47,6 @@ router.post(
         .trim()
         .toLowerCase();
 
-      // Check whether the email is already registered
       const existingUser = await User.findOne({
         email: normalizedEmail,
       });
@@ -62,7 +58,6 @@ router.post(
         return;
       }
 
-      // Hash password before saving
       const hashedPassword = await bcrypt.hash(
         String(password),
         12
@@ -77,7 +72,8 @@ router.post(
       res.status(201).json({
         message: "Account created successfully.",
         user: {
-          id: user._id,
+          _id: String(user._id),
+          id: String(user._id),
           name: user.name,
           email: user.email,
         },
@@ -85,7 +81,6 @@ router.post(
     } catch (error: unknown) {
       console.error("REGISTER ERROR:", error);
 
-      // Handle duplicate email database errors
       if (
         typeof error === "object" &&
         error !== null &&
@@ -105,7 +100,7 @@ router.post(
   }
 );
 
-// LOGIN
+// POST /api/auth/login
 router.post(
   "/login",
   validate(loginSchema),
@@ -141,7 +136,8 @@ router.post(
       res.status(200).json({
         message: "Login successful.",
         user: {
-          id: user._id,
+          _id: String(user._id),
+          id: String(user._id),
           name: user.name,
           email: user.email,
         },
@@ -156,7 +152,7 @@ router.post(
   }
 );
 
-// GET CURRENT USER
+// GET /api/auth/me
 router.get("/me", async (req, res) => {
   try {
     const token = req.cookies?.token;
@@ -199,7 +195,8 @@ router.get("/me", async (req, res) => {
 
     res.status(200).json({
       user: {
-        id: user._id,
+        _id: String(user._id),
+        id: String(user._id),
         name: user.name,
         email: user.email,
       },
@@ -220,15 +217,14 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// LOGOUT
+// POST /api/auth/logout
 router.post("/logout", (_req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite:
-      process.env.NODE_ENV === "production"
-        ? ("none" as const)
-        : ("lax" as const),
+    sameSite: process.env.NODE_ENV === "production"
+      ? ("none" as const)
+      : ("lax" as const),
     path: "/",
   });
 

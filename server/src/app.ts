@@ -8,29 +8,26 @@ import authRouter from "./routes/auth";
 
 const app = express();
 
-// Allowed frontend URLs
 const allowedOrigins = (
   process.env.CLIENT_URL ||
-  "http://localhost:5173,https://aquamarine-profiterole-f0eb27.netlify.app"
+  "http://localhost:5173,http://localhost:5174,https://aquamarine-profiterole-f0eb27.netlify.app"
 )
   .split(",")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
-// Security middleware
 app.use(helmet());
 
-// CORS configuration
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an Origin header
       if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       console.error("CORS blocked origin:", origin);
-      return callback(new Error("Origin not allowed by CORS"));
+      callback(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -38,12 +35,11 @@ app.use(
   })
 );
 
-// Request parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Root route
+// Root health check
 app.get("/", (_req, res) => {
   res.status(200).json({
     message: "Mini CRM API is running",
@@ -51,7 +47,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Health check
+// API health check
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     message: "CRM API is running",
@@ -59,10 +55,10 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Authentication routes
+// Authentication endpoints
 app.use("/api/auth", authRouter);
 
-// Handle unknown routes
+// Unknown route handler
 app.use((_req, res) => {
   res.status(404).json({
     message: "API route not found",
