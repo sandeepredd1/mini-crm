@@ -1,90 +1,78 @@
 
-import { Router, Request, Response } from "express";
-import { createHash, randomBytes } from "crypto";
+import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import rateLimit from "express-rate-limit";
-import nodemailer from "nodemailer";
 
 import User from "../models/User";
-import {
-  forgotPasswordSchema,
-  loginSchema,
-  logoutSchema,
-  registerSchema,
-  resetPasswordSchema,
-} from "../validation/schemas";
 import { validate } from "../middleware/validate";
 import {
-  AuthenticatedRequest,
-  requireAuth,
-} from "../middleware/auth";
+  registerSchema,
+  loginSchema,
+} from "../validation/schemas";
 
 const router = Router();
 
-/* Authentication rate limiter */
-const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    message: "Too many authentication attempts. Please try again later.",
-  },
-});
+const createToken = (userId: string): string => {
+  const secret = process.env.JWT_SECRET;
 
-const passwordResetRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    message: "Too many password reset requests. Please try again later.",
-  },
-});
+  if (!secret) {
+    throw new Error("JWT_SECRET is not configured");
+  }
 
-/* =========================
-   REGISTER
-   POST /api/auth/register
-========================= */
+  return jwt.sign({ userId }, secret, {
+    expiresIn: "7d",
+  });
+};
 
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite:
+    process.env.NODE_ENV === "production"
+      ? ("none" as const)
+      : ("lax" as const),
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+// REGISTER
 router.post(
   "/register",
-  authRateLimiter,
   validate(registerSchema),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req, res) => {
     try {
       const { name, email, password } = req.body;
+      const normalizedEmail = String(email)
+        .trim()
+        .toLowerCase();
 
-      // Normalize email
-      const normalizedEmail = email.trim().toLowerCase();
-
-      // Check existing user
       const existingUser = await User.findOne({
         email: normalizedEmail,
       });
 
       if (existingUser) {
         res.status(409).json({
-          message: "An account with this email already exists",
+          message:
+            "An account with this email already exists.",
         });
         return;
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
+      const hashedPassword = await bcrypt.hash(
+        String(password),
+        12
+      );
 
-      // Create user
       const user = await User.create({
-        name: name.trim(),
+        name: String(name).trim(),
         email: normalizedEmail,
         password: hashedPassword,
       });
 
       res.status(201).json({
-        message: "Registration successful",
+        message: "Account created successfully.",
         user: {
-          id: user._id.toString(),
+          id: user._id,
           name: user.name,
           email: user.email,
         },
@@ -93,85 +81,49 @@ router.post(
       console.error("REGISTER ERROR:", error);
 
       res.status(500).json({
-        message: "Unable to register user",
+        message:
+          "Unable to create your account. Please try again.",
       });
     }
   }
 );
 
-/* =========================
-   LOGIN
-   POST /api/auth/login
-========================= */
-
+// LOGIN
 router.post(
   "/login",
-  authRateLimiter,
   validate(loginSchema),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req, res) => {
     try {
       const { email, password } = req.body;
-
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmail = String(email)
+        .trim()
+        .toLowerCase();
 
       const user = await User.findOne({
         email: normalizedEmail,
       });
 
-      if (!user) {
+      if (
+        !user ||
+        !(await bcrypt.compare(
+          String(password),
+          user.password
+        ))
+      ) {
         res.status(401).json({
-          message: "Invalid email or password",
+          message: "Invalid email or password.",
         });
         return;
       }
 
-      const passwordMatches = await bcrypt.compare(
-        password,
-        user.password
-      );
+      const token = createToken(String(user._id));
 
-      if (!passwordMatches) {
-        res.status(401).json({
-          message: "Invalid email or password",
-        });
-        return;
-      }
-
-      const jwtSecret = process.env.JWT_SECRET;
-
-      if (!jwtSecret) {
-        console.error("JWT_SECRET is missing");
-
-        res.status(500).json({
-          message: "Server authentication configuration is missing",
-        });
-        return;
-      }
-
-      const token = jwt.sign(
-        {
-          userId: user._id.toString(),
-        },
-        jwtSecret,
-        {
-          expiresIn: "7d",
-        }
-      );
-
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite:
-          process.env.NODE_ENV === "production"
-            ? "none"
-            : "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie("token", token, cookieOptions);
 
       res.status(200).json({
-        message: "Login successful",
+        message: "Login successful.",
         user: {
-          id: user._id.toString(),
+          id: user._id,
           name: user.name,
           email: user.email,
         },
@@ -180,178 +132,94 @@ router.post(
       console.error("LOGIN ERROR:", error);
 
       res.status(500).json({
-        message: "Unable to login",
+        message: "Unable to log in. Please try again.",
       });
     }
   }
 );
 
-/* =========================
-   CURRENT USER
-   GET /api/auth/me
-========================= */
+// GET CURRENT USER
+router.get("/me", async (req, res) => {
+  try {
+    const token = req.cookies?.token;
 
-router.get(
-  "/me",
-  requireAuth,
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const user = await User.findById(req.userId).select("-password");
-
-      if (!user) {
-        res.status(404).json({
-          message: "User not found",
-        });
-        return;
-      }
-
-      res.status(200).json({
-        user: {
-          id: user._id.toString(),
-          name: user.name,
-          email: user.email,
-        },
-      });
-    } catch (error) {
-      console.error("AUTH ME ERROR:", error);
-
-      res.status(500).json({
-        message: "Unable to restore session",
-      });
-    }
-  }
-);
-
-/* =========================
-   LOGOUT
-   POST /api/auth/logout
-========================= */
-
-router.post(
-  "/logout",
-  requireAuth,
-  validate(logoutSchema),
-  (_req: AuthenticatedRequest, res: Response): void => {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite:
-        process.env.NODE_ENV === "production"
-          ? "none"
-          : "lax",
-    });
-
-    res.status(200).json({
-      message: "Logout successful",
-    });
-  }
-);
-
-router.post(
-  "/forgot-password",
-  passwordResetRateLimiter,
-  validate(forgotPasswordSchema),
-  async (req: Request, res: Response): Promise<void> => {
-    const smtpUrl = process.env.SMTP_URL;
-    const mailFrom = process.env.MAIL_FROM;
-    const clientUrl = process.env.CLIENT_URL?.split(",")[0]?.trim();
-
-    if (!smtpUrl || !mailFrom || !clientUrl) {
-      res.status(503).json({
-        message: "Password reset email is not configured on this server",
+    if (!token) {
+      res.status(401).json({
+        message: "Not authenticated.",
       });
       return;
     }
 
-    let transporter: ReturnType<typeof nodemailer.createTransport> | undefined;
-    try {
-      const user = await User.findOne({
-        email: req.body.email,
-      });
+    const secret = process.env.JWT_SECRET;
 
-      if (user) {
-        const token = randomBytes(32).toString("hex");
-        const resetTokenHash = createHash("sha256")
-          .update(token)
-          .digest("hex");
-        await User.findByIdAndUpdate(user._id, {
-          $set: {
-            resetTokenHash,
-            resetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-          },
-        });
-
-        const resetUrl = new URL("/reset-password", clientUrl);
-        resetUrl.searchParams.set("token", token);
-
-        transporter = nodemailer.createTransport(smtpUrl);
-        await transporter.sendMail({
-          from: mailFrom,
-          to: user.email,
-          subject: "Reset your Mini CRM password",
-          text: `Use this link within one hour to reset your password: ${resetUrl.toString()}`,
-        });
-      }
-
-      res.status(202).json({
-        message: "If an account exists for that email, a reset link will be sent",
-      });
-    } catch {
-      console.error("Password reset email delivery failed");
-      res.status(500).json({
-        message: "Unable to send the password reset email",
-      });
-    } finally {
-      transporter?.close();
+    if (!secret) {
+      throw new Error("JWT_SECRET is not configured");
     }
-  }
-);
 
-router.post(
-  "/reset-password",
-  passwordResetRateLimiter,
-  validate(resetPasswordSchema),
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const resetTokenHash = createHash("sha256")
-        .update(req.body.token)
-        .digest("hex");
-      const password = await bcrypt.hash(req.body.password, 12);
-      const user = await User.findOneAndUpdate(
-        {
-          resetTokenHash,
-          resetTokenExpiresAt: { $gt: new Date() },
-        },
-        {
-          $set: { password },
-          $unset: {
-            resetTokenHash: 1,
-            resetTokenExpiresAt: 1,
-          },
-        },
-        { new: true }
-      );
+    const decoded = jwt.verify(token, secret);
 
-      if (!user) {
-        res.status(400).json({
-          message: "This password reset link is invalid or has expired",
-        });
-        return;
-      }
-
-      res.status(200).json({
-        message: "Password reset successfully",
+    if (
+      typeof decoded === "string" ||
+      typeof decoded.userId !== "string"
+    ) {
+      res.status(401).json({
+        message: "Invalid authentication token.",
       });
-    } catch {
-      console.error("Password reset failed");
-      res.status(500).json({
-        message: "Unable to reset password",
-      });
+      return;
     }
+
+    const user = await User.findById(
+      decoded.userId
+    ).select("-password");
+
+    if (!user) {
+      res.status(401).json({
+        message: "User not found.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof jwt.JsonWebTokenError ||
+      error instanceof jwt.TokenExpiredError
+    ) {
+      res.status(401).json({
+        message: "Session expired. Please log in again.",
+      });
+      return;
+    }
+
+    console.error("GET CURRENT USER ERROR:", error);
+
+    res.status(500).json({
+      message: "Unable to verify your session.",
+    });
   }
-);
+});
+
+// LOGOUT
+router.post("/logout", (_req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite:
+      process.env.NODE_ENV === "production"
+        ? ("none" as const)
+        : ("lax" as const),
+    path: "/",
+  });
+
+  res.status(200).json({
+    message: "Logged out successfully.",
+  });
+});
 
 export default router;

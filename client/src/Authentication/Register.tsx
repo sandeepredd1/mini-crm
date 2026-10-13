@@ -1,7 +1,9 @@
+
 import { useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
 import api from "../services/api";
 import AuthVisualBackground from "../components/auth/AuthVisualBackground";
 import RegisterForm from "./RegisterForm";
@@ -37,7 +39,9 @@ export default function Register() {
   const passwordStrength = useMemo(() => {
     const password = form.password;
 
-    if (!password) return { label: "", width: "0%" };
+    if (!password) {
+      return { label: "", width: "0%" };
+    }
 
     const score = [
       password.length >= 8,
@@ -46,9 +50,17 @@ export default function Register() {
       /[^A-Za-z0-9]/.test(password),
     ].filter(Boolean).length;
 
-    if (score <= 1) return { label: "Weak", width: "25%" };
-    if (score === 2) return { label: "Medium", width: "50%" };
-    if (score === 3) return { label: "Strong", width: "75%" };
+    if (score <= 1) {
+      return { label: "Weak", width: "25%" };
+    }
+
+    if (score === 2) {
+      return { label: "Medium", width: "50%" };
+    }
+
+    if (score === 3) {
+      return { label: "Strong", width: "75%" };
+    }
 
     return { label: "Very strong", width: "100%" };
   }, [form.password]);
@@ -62,13 +74,16 @@ export default function Register() {
     }));
 
     setError("");
+
     setErrors((previous) => ({
       ...previous,
       [name]: "",
     }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     const nextErrors: RegisterErrors = {};
@@ -101,21 +116,27 @@ export default function Register() {
 
     setErrors(nextErrors);
 
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
 
     setError("");
     setLoading(true);
 
     try {
-      // The API base URL should already include /api.
-      await api.post("/auth/register", {
+      // Axios baseURL already includes /api.
+      const response = await api.post("/auth/register", {
         name,
         email,
         password: form.password,
       });
 
+      console.log("Registration successful:", response.status);
+
       navigate("/login", {
-        state: { message: "Account created successfully. Please log in." },
+        state: {
+          message: "Account created successfully. Please log in.",
+        },
       });
     } catch (requestError: unknown) {
       if (axios.isAxiosError<{ message?: string }>(requestError)) {
@@ -123,20 +144,35 @@ export default function Register() {
         const message = requestError.response?.data?.message;
 
         if (status === 409) {
-          setError(message || "An account with this email already exists.");
+          setError(
+            message || "An account with this email already exists."
+          );
         } else if (status === 400) {
-          setError(message || "Please check your registration details.");
+          setError(
+            message || "Please check your registration details."
+          );
+        } else if (status === 404) {
+          setError(
+            "Registration endpoint not found. Check the deployed backend route."
+          );
+        } else if (status === 500) {
+          setError(
+            message || "Server error. Please try again later."
+          );
         } else if (!requestError.response) {
           setError(
             "Unable to reach the server. Please check your connection and try again."
           );
         } else {
-          setError(message || "Unable to create your account. Please try again.");
+          setError(
+            message || "Unable to create your account. Please try again."
+          );
         }
 
         console.error("Registration API error:", {
           status,
           message,
+          baseURL: requestError.config?.baseURL,
           url: requestError.config?.url,
         });
       } else {
