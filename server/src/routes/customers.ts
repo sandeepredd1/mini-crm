@@ -1,9 +1,10 @@
-import { Router, Response } from "express";
+
+import { Router, type Response } from "express";
 import { Types } from "mongoose";
 
 import Customer from "../models/Customer";
 import {
-  AuthenticatedRequest,
+  type AuthenticatedRequest,
   requireAuth,
 } from "../middleware/auth";
 import { validate } from "../middleware/validate";
@@ -11,6 +12,7 @@ import { customerSchema } from "../validation/schemas";
 
 const router = Router();
 
+// Escape special characters before using search text in a regex.
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -45,6 +47,115 @@ router.post(
 );
 
 /**
+ * GET /api/customers
+ * List customers with search, status filter and pagination
+ */
+router.get(
+  "/",
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const search =
+        typeof req.query.search === "string"
+          ? req.query.search.trim()
+          : "";
+
+      const status =
+        typeof req.query.status === "string"
+          ? req.query.status
+          : "";
+
+      const pageValue =
+        typeof req.query.page === "string"
+          ? Number(req.query.page)
+          : 1;
+
+      const limitValue =
+        typeof req.query.limit === "string"
+          ? Number(req.query.limit)
+          : 10;
+
+      if (!Number.isInteger(pageValue) || pageValue < 1) {
+        res.status(400).json({
+          message: "Page must be a positive integer",
+        });
+        return;
+      }
+
+      if (
+        !Number.isInteger(limitValue) ||
+        limitValue < 1 ||
+        limitValue > 100
+      ) {
+        res.status(400).json({
+          message: "Limit must be between 1 and 100",
+        });
+        return;
+      }
+
+      if (
+        status &&
+        !["active", "inactive", "lead"].includes(status)
+      ) {
+        res.status(400).json({
+          message: "Invalid customer status filter",
+        });
+        return;
+      }
+
+      const page = pageValue;
+      const limit = limitValue;
+      const skip = (page - 1) * limit;
+
+      const query: Record<string, unknown> = {
+        userId: req.userId,
+      };
+
+      if (search) {
+        const safeSearch = escapeRegex(search);
+
+        query.$or = [
+          { name: { $regex: safeSearch, $options: "i" } },
+          { company: { $regex: safeSearch, $options: "i" } },
+          { email: { $regex: safeSearch, $options: "i" } },
+          { phone: { $regex: safeSearch, $options: "i" } },
+        ];
+      }
+
+      if (status) {
+        query.status = status;
+      }
+
+      const [customers, total] = await Promise.all([
+        Customer.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+
+        Customer.countDocuments(query),
+      ]);
+
+      res.status(200).json({
+        customers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch {
+      res.status(500).json({
+        message: "Unable to fetch customers",
+      });
+    }
+  }
+);
+
+/**
  * GET /api/customers/:id
  * Get a single customer
  */
@@ -56,7 +167,10 @@ router.get(
     res: Response
   ): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string"
+          ? req.params.id
+          : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -77,9 +191,7 @@ router.get(
         return;
       }
 
-      res.status(200).json({
-        customer,
-      });
+      res.status(200).json({ customer });
     } catch {
       res.status(500).json({
         message: "Unable to fetch customer",
@@ -101,7 +213,10 @@ router.put(
     res: Response
   ): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string"
+          ? req.params.id
+          : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -155,7 +270,10 @@ router.delete(
     res: Response
   ): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string"
+          ? req.params.id
+          : "";
 
       if (!Types.ObjectId.isValid(id)) {
         res.status(404).json({
@@ -182,100 +300,6 @@ router.delete(
     } catch {
       res.status(500).json({
         message: "Unable to delete customer",
-      });
-    }
-  }
-);
-
-/**
- * GET /api/customers
- * List customers with search, status filter and pagination
- */
-router.get(
-  "/",
-  requireAuth,
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
-    try {
-      const search =
-        typeof req.query.search === "string"
-          ? req.query.search.trim()
-          : "";
-
-      const status =
-        typeof req.query.status === "string"
-          ? req.query.status
-          : "";
-
-      const pageValue =
-        typeof req.query.page === "string"
-          ? Number(req.query.page)
-          : 1;
-
-      const limitValue =
-        typeof req.query.limit === "string"
-          ? Number(req.query.limit)
-          : 10;
-
-      if (!Number.isInteger(pageValue) || pageValue < 1) {
-        res.status(400).json({ message: "Page must be a positive integer" });
-        return;
-      }
-      if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > 100) {
-        res.status(400).json({ message: "Limit must be between 1 and 100" });
-        return;
-      }
-      if (status && !["active", "inactive", "lead"].includes(status)) {
-        res.status(400).json({ message: "Invalid customer status filter" });
-        return;
-      }
-
-      const page = pageValue;
-      const limit = limitValue;
-
-      const query: Record<string, unknown> = {
-        userId: req.userId,
-      };
-
-      if (search) {
-        const safeSearch = escapeRegex(search);
-        query.$or = [
-          { name: { $regex: safeSearch, $options: "i" } },
-          { company: { $regex: safeSearch, $options: "i" } },
-          { email: { $regex: safeSearch, $options: "i" } },
-          { phone: { $regex: safeSearch, $options: "i" } },
-        ];
-      }
-
-      if (status) query.status = status;
-
-      const skip = (page - 1) * limit;
-
-      const [customers, total] = await Promise.all([
-        Customer.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-
-        Customer.countDocuments(query),
-      ]);
-
-      const totalPages = Math.ceil(total / limit);
-
-      res.status(200).json({
-        customers,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-        },
-      });
-    } catch {
-      res.status(500).json({
-        message: "Unable to fetch customers",
       });
     }
   }
