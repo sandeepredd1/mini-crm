@@ -12,6 +12,7 @@ import {
 
 const router = Router();
 
+// Create JWT token
 const createToken = (userId: string): string => {
   const secret = process.env.JWT_SECRET;
 
@@ -24,6 +25,7 @@ const createToken = (userId: string): string => {
   });
 };
 
+// Cookie configuration
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -48,6 +50,7 @@ router.post(
         .trim()
         .toLowerCase();
 
+      // Check whether the email is already registered
       const existingUser = await User.findOne({
         email: normalizedEmail,
       });
@@ -59,6 +62,7 @@ router.post(
         return;
       }
 
+      // Hash password before saving
       const hashedPassword = await bcrypt.hash(
         String(password),
         12
@@ -81,7 +85,7 @@ router.post(
     } catch (error: unknown) {
       console.error("REGISTER ERROR:", error);
 
-      // Handle duplicate email index errors
+      // Handle duplicate email database errors
       if (
         typeof error === "object" &&
         error !== null &&
@@ -201,10 +205,7 @@ router.get("/me", async (req, res) => {
       },
     });
   } catch (error: unknown) {
-    if (
-      error instanceof jwt.JsonWebTokenError ||
-      error instanceof jwt.TokenExpiredError
-    ) {
+    if (error instanceof jwt.JsonWebTokenError) {
       res.status(401).json({
         message: "Session expired. Please log in again.",
       });
