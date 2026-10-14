@@ -2,6 +2,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { createHash } from "crypto";
 
 import User from "../models/User";
 import { validate } from "../middleware/validate";
@@ -19,17 +20,16 @@ const createToken = (userId: string): string => {
     throw new Error("JWT_SECRET is not configured");
   }
 
-  return jwt.sign({ userId }, secret, {
-    expiresIn: "7d",
-  });
+  return jwt.sign({ userId }, secret, { expiresIn: "7d" });
 };
 
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production"
-    ? ("none" as const)
-    : ("lax" as const),
+  sameSite:
+    process.env.NODE_ENV === "production"
+      ? ("none" as const)
+      : ("lax" as const),
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
@@ -38,7 +38,7 @@ const cookieOptions = {
 router.post(
   "/register",
   validate(registerSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const { name, email, password } = req.body;
 
@@ -104,13 +104,13 @@ router.post(
 router.post(
   "/login",
   validate(loginSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
-      const { email, password } = req.body;
-
-      const normalizedEmail = String(email ?? "")
+      const normalizedEmail = String(req.body.email ?? "")
         .trim()
         .toLowerCase();
+
+      const password = String(req.body.password ?? "");
 
       const user = await User.findOne({
         email: normalizedEmail,
@@ -118,13 +118,10 @@ router.post(
 
       if (
         !user ||
-        !(await bcrypt.compare(
-          String(password),
-          user.password
-        ))
+        !(await bcrypt.compare(password, user.password))
       ) {
         res.status(401).json({
-          message: "Invalid email or password.",
+          message: "Invalid email or password",
         });
         return;
       }
@@ -153,13 +150,13 @@ router.post(
 );
 
 // GET /api/auth/me
-router.get("/me", async (req, res) => {
+router.get("/me", async (req, res): Promise<void> => {
   try {
     const token = req.cookies?.token;
 
     if (!token) {
       res.status(401).json({
-        message: "Not authenticated.",
+        message: "Authentication required",
       });
       return;
     }
@@ -177,7 +174,7 @@ router.get("/me", async (req, res) => {
       typeof decoded.userId !== "string"
     ) {
       res.status(401).json({
-        message: "Invalid authentication token.",
+        message: "Authentication required",
       });
       return;
     }
@@ -188,7 +185,7 @@ router.get("/me", async (req, res) => {
 
     if (!user) {
       res.status(401).json({
-        message: "User not found.",
+        message: "Authentication required",
       });
       return;
     }
@@ -204,7 +201,7 @@ router.get("/me", async (req, res) => {
   } catch (error: unknown) {
     if (error instanceof jwt.JsonWebTokenError) {
       res.status(401).json({
-        message: "Session expired. Please log in again.",
+        message: "Authentication required",
       });
       return;
     }
@@ -218,13 +215,14 @@ router.get("/me", async (req, res) => {
 });
 
 // POST /api/auth/logout
-router.post("/logout", (_req, res) => {
+router.post("/logout", (_req, res): void => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production"
-      ? ("none" as const)
-      : ("lax" as const),
+    sameSite:
+      process.env.NODE_ENV === "production"
+        ? ("none" as const)
+        : ("lax" as const),
     path: "/",
   });
 
@@ -232,5 +230,105 @@ router.post("/logout", (_req, res) => {
     message: "Logged out successfully.",
   });
 });
+
+// POST /api/auth/forgot-password
+router.post(
+  "/forgot-password",
+  async (req, res): Promise<void> => {
+    try {
+      if (!process.env.SMTP_URL || !process.env.MAIL_FROM) {
+        res.status(503).json({
+          message:
+            "Password reset email is not configured on this server",
+        });
+        return;
+      }
+
+      const email = String(req.body.email ?? "")
+        .trim()
+        .toLowerCase();
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.status(400).json({
+          message: "A valid email address is required",
+        });
+        return;
+      }
+
+      // Email delivery is not implemented here.
+      // Do not report that a reset email was sent.
+      res.status(503).json({
+        message: "Password reset email delivery is not available",
+      });
+    } catch (error: unknown) {
+      console.error("FORGOT PASSWORD ERROR:", error);
+
+      res.status(500).json({
+        message: "Unable to process the password reset request",
+      });
+    }
+  }
+);
+
+// POST /api/auth/reset-password
+router.post(
+  "/reset-password",
+  async (req, res): Promise<void> => {
+    try {
+      const token = String(req.body.token ?? "");
+      const password = String(req.body.password ?? "");
+
+      if (
+        !/^[a-f0-9]{64}$/i.test(token) ||
+        password.length < 8
+      ) {
+        res.status(400).json({
+          message:
+            "This password reset link is invalid or has expired",
+        });
+        return;
+      }
+
+      const resetTokenHash = createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const user = await User.findOneAndUpdate(
+        {
+          resetTokenHash,
+          resetTokenExpiresAt: { $gt: new Date() },
+        },
+        {
+          $set: { password: hashedPassword },
+          $unset: {
+            resetTokenHash: 1,
+            resetTokenExpiresAt: 1,
+          },
+        },
+        { new: true }
+      );
+
+      if (!user) {
+        res.status(400).json({
+          message:
+            "This password reset link is invalid or has expired",
+        });
+        return;
+      }
+
+      res.status(200).json({
+        message: "Password reset successful",
+      });
+    } catch (error: unknown) {
+      console.error("RESET PASSWORD ERROR:", error);
+
+      res.status(500).json({
+        message: "Unable to reset your password",
+      });
+    }
+  }
+);
 
 export default router;
