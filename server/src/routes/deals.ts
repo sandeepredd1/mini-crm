@@ -1,3 +1,4 @@
+
 import { Router, Response } from "express";
 import { Types } from "mongoose";
 
@@ -12,6 +13,14 @@ import { dealSchema } from "../validation/schemas";
 
 const router = Router();
 
+const VALID_STAGES = [
+  "Lead",
+  "Qualified",
+  "Proposal",
+  "Won",
+  "Lost",
+];
+
 /**
  * POST /api/deals
  * Create a deal
@@ -20,17 +29,15 @@ router.post(
   "/",
   requireAuth,
   validate(dealSchema),
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { customerId } = req.body;
 
-      if (!Types.ObjectId.isValid(customerId)) {
-        res.status(400).json({
-          message: "Invalid customer ID",
-        });
+      if (
+        typeof customerId !== "string" ||
+        !Types.ObjectId.isValid(customerId)
+      ) {
+        res.status(400).json({ message: "Invalid customer ID" });
         return;
       }
 
@@ -40,9 +47,7 @@ router.post(
       });
 
       if (!customer) {
-        res.status(404).json({
-          message: "Customer not found",
-        });
+        res.status(404).json({ message: "Customer not found" });
         return;
       }
 
@@ -56,10 +61,9 @@ router.post(
         message: "Deal created successfully",
         deal,
       });
-    } catch {
-      res.status(500).json({
-        message: "Unable to create deal",
-      });
+    } catch (error) {
+      console.error("CREATE DEAL ERROR:", error);
+      res.status(500).json({ message: "Unable to create deal" });
     }
   }
 );
@@ -67,23 +71,22 @@ router.post(
 /**
  * GET /api/deals
  * Get all deals for the logged-in user
+ * Optional filters: stage, customerId
  */
 router.get(
   "/",
   requireAuth,
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const stage =
         typeof req.query.stage === "string" ? req.query.stage : "";
+
       const customerId =
         typeof req.query.customerId === "string"
           ? req.query.customerId
           : "";
 
-      if (stage && !["Lead", "Qualified", "Proposal", "Won", "Lost"].includes(stage)) {
+      if (stage && !VALID_STAGES.includes(stage)) {
         res.status(400).json({ message: "Invalid deal stage filter" });
         return;
       }
@@ -96,44 +99,36 @@ router.get(
       const query: Record<string, unknown> = {
         userId: req.userId,
       };
+
       if (stage) query.stage = stage;
       if (customerId) query.customerId = customerId;
 
-      const deals = await Deal.find({
-        ...query,
-      })
+      const deals = await Deal.find(query)
         .populate("customerId", "name company email")
         .sort({ createdAt: -1 });
 
-      res.status(200).json({
-        deals,
-      });
-    } catch {
-      res.status(500).json({
-        message: "Unable to fetch deals",
-      });
+      res.status(200).json({ deals });
+    } catch (error) {
+      console.error("FETCH DEALS ERROR:", error);
+      res.status(500).json({ message: "Unable to fetch deals" });
     }
   }
 );
 
 /**
  * GET /api/deals/:id
- * Get a single deal
+ * Get one deal belonging to the logged-in user
  */
 router.get(
   "/:id",
   requireAuth,
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
@@ -143,19 +138,14 @@ router.get(
       }).populate("customerId", "name company email");
 
       if (!deal) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
-      res.status(200).json({
-        deal,
-      });
-    } catch {
-      res.status(500).json({
-        message: "Unable to fetch deal",
-      });
+      res.status(200).json({ deal });
+    } catch (error) {
+      console.error("FETCH DEAL ERROR:", error);
+      res.status(500).json({ message: "Unable to fetch deal" });
     }
   }
 );
@@ -168,25 +158,22 @@ router.put(
   "/:id",
   requireAuth,
   validate(dealSchema),
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string" ? req.params.id : "";
       const { customerId } = req.body;
 
       if (!Types.ObjectId.isValid(id)) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
-      if (!Types.ObjectId.isValid(customerId)) {
-        res.status(400).json({
-          message: "Invalid customer ID",
-        });
+      if (
+        typeof customerId !== "string" ||
+        !Types.ObjectId.isValid(customerId)
+      ) {
+        res.status(400).json({ message: "Invalid customer ID" });
         return;
       }
 
@@ -196,9 +183,7 @@ router.put(
       });
 
       if (!customer) {
-        res.status(404).json({
-          message: "Customer not found",
-        });
+        res.status(404).json({ message: "Customer not found" });
         return;
       }
 
@@ -220,9 +205,7 @@ router.put(
       ).populate("customerId", "name company email");
 
       if (!deal) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
@@ -230,32 +213,27 @@ router.put(
         message: "Deal updated successfully",
         deal,
       });
-    } catch {
-      res.status(500).json({
-        message: "Unable to update deal",
-      });
+    } catch (error) {
+      console.error("UPDATE DEAL ERROR:", error);
+      res.status(500).json({ message: "Unable to update deal" });
     }
   }
 );
 
 /**
  * DELETE /api/deals/:id
- * Delete a deal
+ * Delete a deal belonging to the logged-in user
  */
 router.delete(
   "/:id",
   requireAuth,
-  async (
-    req: AuthenticatedRequest,
-    res: Response
-  ): Promise<void> => {
+  async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const id = typeof req.params.id === "string" ? req.params.id : "";
+      const id =
+        typeof req.params.id === "string" ? req.params.id : "";
 
       if (!Types.ObjectId.isValid(id)) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
@@ -265,19 +243,16 @@ router.delete(
       });
 
       if (!deal) {
-        res.status(404).json({
-          message: "Deal not found",
-        });
+        res.status(404).json({ message: "Deal not found" });
         return;
       }
 
       res.status(200).json({
         message: "Deal deleted successfully",
       });
-    } catch {
-      res.status(500).json({
-        message: "Unable to delete deal",
-      });
+    } catch (error) {
+      console.error("DELETE DEAL ERROR:", error);
+      res.status(500).json({ message: "Unable to delete deal" });
     }
   }
 );
